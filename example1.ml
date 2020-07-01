@@ -54,14 +54,15 @@ module RELattice =
 
     let base_funcs = [("null",null); ("a",a); ("b",b); ("c",c); ("ite",ite)]           
   end
-  
-module RE = MakeHOLattice(RELattice)
-
 
 let _ =
   n := (try
           int_of_string Sys.argv.(1)
         with _ -> 2);
+  
+module RE = MakeHOLattice(RELattice)
+
+let _ =
   let phi_reach =
     let typ0 = grtype in
     let typ1 = FuncType([typ0]) in

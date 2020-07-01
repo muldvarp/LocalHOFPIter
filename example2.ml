@@ -3,7 +3,7 @@
 open HOFPIteration
 
 (*let tokens = ref "bscscbsscsc" *)
-let tokens = ref "bsc"
+let tokens = ref "bs"
            
 module ParsingLattice =
   struct     
@@ -23,7 +23,7 @@ module ParsingLattice =
     let first = Bot
     let next = function Top -> None
                       | Bot -> Some(Num(0))
-                      | Num(i) -> if i = (n ()) then Some(Top) else Some(Num(i+1))
+                      | Num(i) -> if i = String.length !tokens then Some(Top) else Some(Num(i+1))
                                 
     let num i = Num(i)
               
@@ -65,12 +65,14 @@ module ParsingLattice =
     let base_funcs = [("start",start); ("end",ende); ("block",block); ("code",code); ("space",space); ("eps",epsilon);
                       ("disj",disj); ("conj",conj); ("choice",join); ("next",nxt)]           
   end
-  
-module Parsing = MakeHOLattice(ParsingLattice)
 
 let _ =
   if Array.length Sys.argv > 1 then tokens := Sys.argv.(1);
   print_string ("Parsing " ^ !tokens ^ "\n");
+
+module Parsing = MakeHOLattice(ParsingLattice)
+
+let _ =
   let phi_parse =
     let i = ref 0 in
     let get_var pre =
@@ -94,7 +96,7 @@ let _ =
     let choice3 x y z = choice x (choice y z) in
     let disj x y = Appl(Base("disj"),[(x,typ0);(y,typ0)]) in
     let conj x y = Appl(Base("conj"),[(x,typ0);(y,typ0)]) in
-    let concat' =
+    let concat' _ =
       let f = get_var "f" in
       let g = get_var "g" in
       let s = get_var "s" in
@@ -105,7 +107,7 @@ let _ =
                                                  (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
                                            (Appl(Var(x),[(Appl(Base("nxt"),[(Var(h),typ0)]),typ0)])))))
     in
-    let concat f g = Appl(concat',[(f,typ1);(g,typ1)]) in 
+    let concat f g = Appl(concat' (),[(f,typ1);(g,typ1)]) in 
     let concat3 f g h = concat f (concat g h) in
     
     let nontermS _ =
