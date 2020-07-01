@@ -74,7 +74,7 @@ let _ =
   let phi_parse =
     let i = ref 0 in
     let get_var pre =
-      let j = i in
+      let j = !i in
       incr i;
       pre ^ string_of_int j
     in
@@ -114,7 +114,7 @@ let _ =
     in
     let nontermB = Mu("B", Lamb(["I"], choice3 epsilon
                                                (concat3 (Var("I")) code (Appl(Var("B"),[(Var("I"),typ1)])))
-                                               (concat3 (Var("I")) block (Appl(Var("B"),[(concat (nontermS ())) (Var("I")), typ1)])))))
+                                               (concat3 (Var("I")) block (Appl(Var("B"),[(concat (nontermS ()) (Var("I")), typ1)])))))
     in
     let nontermP = Mu("P", concat block (Appl(nontermB,[(nontermS (),typ1)]))) in
     Appl(nontermP, [start; ende])
