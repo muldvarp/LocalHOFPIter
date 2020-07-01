@@ -62,7 +62,7 @@ module ParsingLattice =
     let nxt = function [Num(i)] -> if i < (n ()) then Num(i+1) else Bot
                      | _ -> Bot
                           
-    let base_funcs = [("start",start); ("end",ende); ("block",block); ("code",code); ("space",space); ("eps",epsilon);
+    let base_funcs = [("start",start); ("end",ende); ("block",block); ("code",code); ("space",space); ("epsilon",epsilon);
                       ("disj",disj); ("conj",conj); ("choice",join); ("next",nxt)]           
   end
 
@@ -86,7 +86,7 @@ let _ =
     let ende = (Base("end"),typ0) in
     let code = Base("code") in
     let block = Base("block") in
-    let epsilon = Base("eps") in
+    let epsilon = Base("epsilon") in
     let space = Base("space") in
     let choice f g =
       let s = get_var "s" in
