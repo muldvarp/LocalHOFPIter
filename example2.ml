@@ -86,7 +86,7 @@ let _ =
     let ende = (Base("end"),typ0) in
     let code = Base("code") in
     let block = Base("block") in
-    let epsilon = Base("epsilon") in
+    let epsilon = Base("eps") in
     let space = Base("space") in
     let choice f g =
       let s = get_var "s" in
@@ -103,9 +103,9 @@ let _ =
       let e = get_var "e" in
       let x = get_var "X" in
       let h = get_var "h" in
-      Lamb([f;g;s;e], Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
+      Lamb([f;g;s;e], Appl(Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
                                                  (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
-                                           (Appl(Var(x),[(Appl(Base("nxt"),[(Var(h),typ0)]),typ0)])))))
+                                           (Appl(Var(x),[(Appl(Base("next"),[(Var(h),typ0)]),typ0)])))), [(Var(s),typ0)]))
     in
     let concat f g = Appl(concat' (),[(f,typ1);(g,typ1)]) in 
     let concat3 f g h = concat f (concat g h) in
@@ -122,4 +122,3 @@ let _ =
     Appl(nontermP, [start; ende])
   in
   Parsing.evaluate phi_parse
-
