@@ -70,8 +70,14 @@ module Parsing = MakeHOLattice(ParsingLattice)
 
 let _ =
   if Array.length Sys.argv > 1 then tokens := Sys.argv.(1);
-  print_string !tokens;
+  print_string ("Parsing " ^ !tokens ^ "\n");
   let phi_parse =
+    let i = ref 0 in
+    let get_var pre =
+      let j = i in
+      incr i;
+      pre ^ string_of_int j
+    in
     let typ0 = grtype in
     let typ1 = FuncType([typ0;typ0]) in
     let start = (Base("start"),typ0) in
@@ -80,23 +86,37 @@ let _ =
     let block = Base("block") in
     let epsilon = Base("epsilon") in
     let space = Base("space") in
-    let choice f g = Lamb(["s";"e"],Appl(Base("choice"),[(Appl(f,[(Var("s"),typ0);(Var("e"),typ0)]),typ0); (Appl(g,[(Var("s"),typ0);(Var("e"),typ0)]),typ0)])) in
+    let choice f g =
+      let s = get_var "s" in
+      let e = get_var "e" in
+      Lamb([s;e],Appl(Base("choice"),[(Appl(f,[(Var(s),typ0);(Var(e),typ0)]),typ0); (Appl(g,[(Var(s),typ0);(Var(e),typ0)]),typ0)]))
+    in
     let choice3 x y z = choice x (choice y z) in
     let disj x y = Appl(Base("disj"),[(x,typ0);(y,typ0)]) in
     let conj x y = Appl(Base("conj"),[(x,typ0);(y,typ0)]) in
-    let concat' = Lamb(["f";"g";"s";"e"], Mu("X", Lamb(["h"], disj (conj (Appl(Var("f"),[(Var("s"),typ0);(Var("h"),typ0)]))
-                                                                      (Appl(Var("g"),[(Var("h"),typ0);(Var("e"),typ0)])))
-                                                                (Appl(Var("X"),[(Appl(Base("nxt"),[(Var("h"),typ0)]),typ0)])))))
+    let concat' =
+      let f = get_var "f" in
+      let g = get_var "g" in
+      let s = get_var "s" in
+      let e = get_var "e" in
+      let x = get_var "X" in
+      let h = get_var "h" in
+      Lamb([f;g;s;e], Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
+                                                 (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
+                                           (Appl(Var(x),[(Appl(Base("nxt"),[(Var(h),typ0)]),typ0)])))))
     in
     let concat f g = Appl(concat',[(f,typ1);(g,typ1)]) in 
     let concat3 f g h = concat f (concat g h) in
     
-    let nontermS = Mu("S", choice space (concat space (Var("S")))) in
+    let nontermS _ =
+      let s = get_var "S" in
+      Mu(s, choice space (concat space (Var(s))))
+    in
     let nontermB = Mu("B", Lamb(["I"], choice3 epsilon
                                                (concat3 (Var("I")) code (Appl(Var("B"),[(Var("I"),typ1)])))
-                                               (concat3 (Var("I")) block (Appl(Var("B"),[(concat (Var("S")) (Var("I")), typ1)])))))
+                                               (concat3 (Var("I")) block (Appl(Var("B"),[(concat (nontermS ())) (Var("I")), typ1)])))))
     in
-    let nontermP = Mu("P", concat block (Appl(nontermB,[(nontermS,typ1)]))) in
+    let nontermP = Mu("P", concat block (Appl(nontermB,[(nontermS (),typ1)]))) in
     Appl(nontermP, [start; ende])
   in
   Parsing.evaluate phi_parse

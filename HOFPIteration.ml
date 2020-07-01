@@ -6,7 +6,7 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 1 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
+let verbosity = 3 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
 let depth = ref 0
 let section_start = ref true
 let indent_up _  = incr depth;
@@ -146,7 +146,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                      ^ "]"
                                    else
                                      "[.]")
-                                   ^ " #=" ^ string_of_int (List.length entries)
+                                   ^ " of width " ^ string_of_int (List.length entries)
       in
       show true
       
