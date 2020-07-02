@@ -6,7 +6,7 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 1 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
+let verbosity = 3 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
 let depth = ref 0
 let section_start = ref true
 let indent_up _  = incr depth;
@@ -34,6 +34,13 @@ type term = Var of string
           | Mu of string * (term)
           | Nu of string * (term)
 
+let rec is_subterm t t' = (t=t') || match t' with
+                                      Appl(s,ts) -> (is_subterm t s) || (List.fold_left (fun b -> fun (t',_) -> b || is_subterm t t') false ts)
+                                    | Lamb(_,t'') -> is_subterm t t''
+                                    | Mu(_,t'') -> is_subterm t t''
+                                    | Nu(_,t'') -> is_subterm t t''
+                                    | _ -> false
+                                         
 let show_term =
   let is_atomic = function Var _  -> true
                          | Base _ -> true
@@ -191,12 +198,16 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                          
     let evaluate term =
       let env = ref [] in
-      let update_env x t = 
-        env := (x,t)::(List.remove_assoc x !env)
+      let update_env t v = 
+        env := (t,v)::(List.filter (fun (t',_) -> not (is_subterm t t')) !env)
       in
-      let get_var_table x = try 
-                              List.assoc x !env
-                            with Not_found -> failwith ("ERROR: unbound variable `" ^ x ^ "´!")
+      let get_table t = try
+                          Some(List.assoc t !env)
+                        with Not_found -> None
+      in
+      let get_var_table x = match get_table (Var(x)) with  
+                                  Some(table) -> table
+                                | None -> failwith ("ERROR: unbound variable `" ^ x ^ "´!")
       in
       let show_arguments args =
         List.iteri (fun i -> fun t -> output 2 (" #" ^ string_of_int i ^ "=" ^ show_table t)) args;
@@ -205,7 +216,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
         let xt = get_var_table x in
         match xt with
           Table(entries) -> let rec find_in = function [] -> failwith ("ERROR: table for variable `" ^ x ^ "´ has no default value!")
-                                                     | (Any,v)::_ -> update_env x (Table((Key(args),v)::entries)); v
+                                                     | (Any,v)::_ -> update_env (Var(x)) (Table((Key(args),v)::entries)); v
                                                      | (Key(args'),v)::ps -> if try
                                                                                  List.for_all2 (fun t1 -> fun t2 -> tables_equal t1 t2) args args'
                                                                                with Invalid_argument(_) -> false
@@ -242,7 +253,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
       in
 
       let show_environment d =
-        List.iter (fun (x,t) -> output d (" " ^ x ^ "=" ^ show_table t)) !env;
+        List.iter (fun (x,t) -> output d (" " ^ show_term x ^ " = " ^ show_table t)) !env;
       in
 
       let merge_iterations =
@@ -265,8 +276,18 @@ module MakeHOLattice(M: Lattice): HOLattice =
                        base_func_lookup args f
           | Appl(t,ts) -> output 2 "Application case.";
                           let new_args = List.map (fun (t',tau) -> indent_up ();
-                                                                   output 3 ("Now making table for argument `" ^ show_term t' ^ "´");
-                                                                   let table = make_table (eval t') tau in
+                                                                   let table = match get_table t' with
+                                                                       Some(table) -> begin
+                                                                                        output 3 ("Table for argument `" ^ show_term t' ^ "´ is available.");
+                                                                                        table
+                                                                                      end
+                                                                      | None -> begin
+                                                                                  output 3 ("Now making table for argument `" ^ show_term t' ^ "´");
+                                                                                  let table = make_table (eval t') tau in
+                                                                                  update_env t' table;
+                                                                                  table
+                                                                                end
+                                                                   in
                                                                    indent_down ();
                                                                    table)
                                            ts
@@ -276,14 +297,14 @@ module MakeHOLattice(M: Lattice): HOLattice =
                           let rec bind ys bs = match (ys,bs) with
                               ([],_) -> bs
                             | (z::zs,[]) -> failwith "ERROR: not enough arguments to bind all lambda variables!"
-                            | (z::zs,c::cs) -> update_env z c;
+                            | (z::zs,c::cs) -> update_env (Var(z)) c;
                                                bind zs cs
                           in
                           let rargs = bind xs args in
                           eval t rargs
           | Mu(x,t) -> let i = ref 0 in
                        output 2 "LFP case.";
-                       update_env x (Table([(Key(args),M.bot); (Any,M.bot)]));
+                       update_env (Var(x)) (Table([(Key(args),M.bot); (Any,M.bot)]));
                        while output 3 (let l = List.length !env in
                                        "starting LFP iteration #" ^ string_of_int !i ^ " with " ^
                                          (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
@@ -295,12 +316,12 @@ module MakeHOLattice(M: Lattice): HOLattice =
                              let lx = table_width xt in
                              if (ln <> lx) then
                                begin
-                                 update_env x (merge_iterations (xt,next_table));
+                                 update_env (Var(x)) (merge_iterations (xt,next_table));
                                  true
                                end
                              else
                                begin
-                                 update_env x next_table;
+                                 update_env (Var(x)) next_table;
                                  changed
                                end
                        do ()
@@ -308,7 +329,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                        table_lookup args (get_var_table x)
           | Nu(x,t) -> let i = ref 0 in
                        output 2 "GFP case.";
-                       update_env x (Table([(Key(args),M.top); (Any,M.top)]));
+                       update_env (Var(x)) (Table([(Key(args),M.top); (Any,M.top)]));
                        while output 3 (let l = List.length !env in
                                        "starting GFP iteration #" ^ string_of_int !i ^ " with " ^
                                          (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
@@ -320,12 +341,12 @@ module MakeHOLattice(M: Lattice): HOLattice =
                              let lx = table_width xt in
                              if (ln <> lx) then
                                begin
-                                 update_env x (merge_iterations (xt,next_table));
+                                 update_env (Var(x)) (merge_iterations (xt,next_table));
                                  true
                                end
                              else
                                begin
-                                 update_env x next_table;
+                                 update_env (Var(x)) next_table;
                                  changed
                                end
                        do ()
