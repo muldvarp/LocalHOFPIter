@@ -13,6 +13,13 @@ module ParsingLattice =
            | Bot
            | Num of int
 
+    let equal x y =
+      match (x,y) with
+          (Top,Top) -> true
+        | (Bot,Bot) -> true
+        | (Num i, Num j) -> i = j
+        | _ -> false
+          
     let show = function Top -> "T"
                       | Bot -> "B"
                       | Num(i) -> string_of_int i
