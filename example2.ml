@@ -13,6 +13,13 @@ module ParsingLattice =
            | Bot
            | Num of int
 
+    let equal x y =
+      match (x,y) with
+          (Top,Top) -> true
+        | (Bot,Bot) -> true
+        | (Num i, Num j) -> i = j
+        | _ -> false
+          
     let show = function Top -> "T"
                       | Bot -> "B"
                       | Num(i) -> string_of_int i
@@ -62,7 +69,7 @@ module ParsingLattice =
     let nxt = function [Num(i)] -> if i < (n ()) then Num(i+1) else Bot
                      | _ -> Bot
                           
-    let base_funcs = [("start",start); ("end",ende); ("block",block); ("code",code); ("space",space); ("eps",epsilon);
+    let base_funcs = [("start",start); ("end",ende); ("block",block); ("code",code); ("space",space); ("epsilon",epsilon);
                       ("disj",disj); ("conj",conj); ("choice",join); ("next",nxt)]           
   end
 
@@ -103,9 +110,9 @@ let _ =
       let e = get_var "e" in
       let x = get_var "X" in
       let h = get_var "h" in
-      Lamb([f;g;s;e], Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
+      Lamb([f;g;s;e], Appl(Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
                                                  (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
-                                           (Appl(Var(x),[(Appl(Base("nxt"),[(Var(h),typ0)]),typ0)])))))
+                                           (Appl(Var(x),[(Appl(Base("next"),[(Var(h),typ0)]),typ0)])))), [(Var(s),typ0)]))
     in
     let concat f g = Appl(concat' (),[(f,typ1);(g,typ1)]) in 
     let concat3 f g h = concat f (concat g h) in
@@ -122,4 +129,3 @@ let _ =
     Appl(nontermP, [start; ende])
   in
   Parsing.evaluate phi_parse
-

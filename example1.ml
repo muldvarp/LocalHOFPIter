@@ -10,6 +10,13 @@ module RELattice =
            | Bot
            | Num of int
 
+    let equal x y =
+      match (x,y) with
+          (Top,Top) -> true
+        | (Bot,Bot) -> true
+        | (Num i, Num j) -> i = j
+        | _ -> false
+    
     let show = function Top -> "T"
                       | Bot -> "B"
                       | Num(i) -> string_of_int i
@@ -27,7 +34,7 @@ module RELattice =
     let height _ = 3
     let size _ = 3 * !n + 3
 
-    let null _ = num(0)
+    let null _ = Num(0)
     let a = function [Top]    -> Top
                    | [Num(i)] -> if i=0 then Num(!n-1)
                                  else if i < !n then Num(i-1)

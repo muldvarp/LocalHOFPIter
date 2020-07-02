@@ -6,7 +6,7 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 3 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
+let verbosity = 1 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
 let depth = ref 0
 let section_start = ref true
 let indent_up _  = incr depth;
@@ -61,7 +61,9 @@ module type Lattice =
     type t
 
     val show: t -> string
-      
+    
+    val equal : t -> t -> bool
+
     val top: t
     val bot: t
       
@@ -159,7 +161,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                      entries
       in 
       match (table1,table2) with
-         (Const(x),Const(y)) -> x=y
+         (Const(x),Const(y)) ->  M.equal x y
        | (Table(entries1),Table(entries2)) -> (includes entries1 table2) && (includes entries2 table1)
        | _ -> false
     and table_lookup args table =
@@ -196,6 +198,9 @@ module MakeHOLattice(M: Lattice): HOLattice =
                               List.assoc x !env
                             with Not_found -> failwith ("ERROR: unbound variable `" ^ x ^ "´!")
       in
+      let show_arguments args =
+        List.iteri (fun i -> fun t -> output 2 (" #" ^ string_of_int i ^ "=" ^ show_table t)) args;
+      in
       let var_table_lookup args x =
         let xt = get_var_table x in
         match xt with
@@ -205,7 +210,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                                                                  List.for_all2 (fun t1 -> fun t2 -> tables_equal t1 t2) args args'
                                                                                with Invalid_argument(_) -> false
                                                                              then v
-                                                                             else find_in ps 
+      else begin show_arguments args';show_arguments args; find_in ps end
                             in
                             find_in entries
         | Const(c) -> c  
@@ -238,10 +243,6 @@ module MakeHOLattice(M: Lattice): HOLattice =
 
       let show_environment d =
         List.iter (fun (x,t) -> output d (" " ^ x ^ "=" ^ show_table t)) !env;
-      in
-
-      let show_arguments args =
-        List.iteri (fun i -> fun t -> output 2 (" #" ^ string_of_int i ^ "=" ^ show_table t)) args;
       in
 
       let merge_iterations =
