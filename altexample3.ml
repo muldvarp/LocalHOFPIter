@@ -52,8 +52,7 @@ module PowerSetLattice =
     let neg = function [x] -> Array.map not x
                      | _   -> failwith ("ERROR: wrong number of arguments given to function `neg´!")    
     
-    let a_dia = function [x] -> (print_string (">>> " ^ string_of_int !n ^ ", " ^ string_of_int (Array.length x) ^ " <<<\n");
-                                try
+    let a_dia = function [x] -> (try
                                   Array.init !n (fun i -> (i>0 && x.(i-1)) || (i< !n-1) && x.(i+1))
                                 with Invalid_argument _ -> failwith "Hier!")
                        | _   -> failwith ("ERROR: wrong number of arguments given to function `a-diamond!")
@@ -63,7 +62,7 @@ module PowerSetLattice =
                               | _     -> failwith ("ERROR: wrong number of arguments given to function `a-box!")
      *)
                                 
-    let b_dia = function [x] -> Array.init !n (fun i -> i=0 && x.(0))
+    let b_dia = function [x] -> Array.init !n (fun i -> i <= 1 && x.(0))
                        | _   -> failwith ("ERROR: wrong number of arguments given to function `b-diamond!")
     
     (*

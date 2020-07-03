@@ -227,7 +227,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                                                                  List.for_all2 (fun t1 -> fun t2 -> tables_equal t1 t2) args args'
                                                                                with Invalid_argument(_) -> false
                                                                              then v
-      else begin show_arguments args';show_arguments args; find_in ps end
+                                                                             else begin show_arguments args';show_arguments args; find_in ps end
                             in
                             find_in entries
         | Const(c) -> c  
