@@ -2,8 +2,12 @@
 
 open HOFPIteration
 
-(*let tokens = ref "bscscbsscsc" *)
 let tokens = ref "bs"
+
+let _ =
+  if Array.length Sys.argv > 1 then tokens := Sys.argv.(1);
+  print_string ("Parsing " ^ !tokens ^ "\n");
+
            
 module ParsingLattice =
   struct     
@@ -73,10 +77,6 @@ module ParsingLattice =
                       ("disj",disj); ("conj",conj); ("choice",join); ("next",nxt)]           
   end
 
-let _ =
-  if Array.length Sys.argv > 1 then tokens := Sys.argv.(1);
-  print_string ("Parsing " ^ !tokens ^ "\n");
-
 module Parsing = MakeHOLattice(ParsingLattice)
 
 let _ =
@@ -89,6 +89,7 @@ let _ =
     in
     let typ0 = grtype in
     let typ1 = FuncType([typ0;typ0]) in
+    let typ2 = FuncType([typ1]) in
     let start = (Base("start"),typ0) in
     let ende = (Base("end"),typ0) in
     let code = Base("code") in
@@ -110,22 +111,22 @@ let _ =
       let e = get_var "e" in
       let x = get_var "X" in
       let h = get_var "h" in
-      Lamb([f;g;s;e], Appl(Mu(x, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
-                                                 (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
-                                           (Appl(Var(x),[(Appl(Base("next"),[(Var(h),typ0)]),typ0)])))), [(Var(s),typ0)]))
+      Lamb([f;g;s;e], Appl(Mu(x, typ0, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
+                                                         (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
+                                                   (Appl(Var(x),[(Appl(Base("next"),[(Var(h),typ0)]),typ0)])))), [(Var(s),typ0)]))
     in
     let concat f g = Appl(concat' (),[(f,typ1);(g,typ1)]) in 
     let concat3 f g h = concat f (concat g h) in
     
     let nontermS _ =
       let s = get_var "S" in
-      Mu(s, choice space (concat space (Var(s))))
+      Mu(s, typ1, choice space (concat space (Var(s))))
     in
-    let nontermB = Mu("B", Lamb(["I"], choice3 epsilon
+    let nontermB = Mu("B", typ2, Lamb(["I"], choice3 epsilon
                                                (concat3 (Var("I")) code (Appl(Var("B"),[(Var("I"),typ1)])))
                                                (concat3 (Var("I")) block (Appl(Var("B"),[(concat (nontermS ()) (Var("I")), typ1)])))))
     in
-    let nontermP = Mu("P", concat block (Appl(nontermB,[(nontermS (),typ1)]))) in
+    let nontermP = Mu("P", typ1, concat block (Appl(nontermB,[(nontermS (),typ1)]))) in
     Appl(nontermP, [start; ende])
   in
   Parsing.evaluate phi_parse

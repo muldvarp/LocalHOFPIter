@@ -6,7 +6,11 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 3 (* 0=silent, 1=see recursion and results, 2=... and arguments and environments, 3=... and function table building in application cases *)
+let verbosity = 2 (* 0=silent, 
+                     1=see recursion and results, 
+                     2=... plus info about number and widths of tables in fixpoint iterations, 
+                     3=... and arguments and environments, 
+                     4=... and function table building in application cases *)
 let depth = ref 0
 let section_start = ref true
 let indent_up _  = incr depth;
@@ -30,15 +34,15 @@ let grtype = FuncType([])
 type term = Var of string
           | Base of string
           | Appl of term * ((term * ho_type) list)
-          | Lamb of string list * (term)
-          | Mu of string * (term)
-          | Nu of string * (term)
+          | Lamb of string list * term
+          | Mu of string * ho_type * term
+          | Nu of string * ho_type * term
 
 let rec is_subterm t t' = (t=t') || match t' with
                                       Appl(s,ts) -> (is_subterm t s) || (List.fold_left (fun b -> fun (t',_) -> b || is_subterm t t') false ts)
                                     | Lamb(_,t'') -> is_subterm t t''
-                                    | Mu(_,t'') -> is_subterm t t''
-                                    | Nu(_,t'') -> is_subterm t t''
+                                    | Mu(_,_,t'') -> is_subterm t t''
+                                    | Nu(_,_,t'') -> is_subterm t t''
                                     | _ -> false
                                          
 let show_term =
@@ -56,8 +60,8 @@ let show_term =
                                         in
                                         lpo ^ show t ^ rpo ^ sep ^ lpa ^ String.concat "," (List.map (fun (t,_) -> show t) ts) ^ rpa
                         | Lamb(xs,t) -> "\\" ^ String.concat "," xs ^ "." ^ show t
-                        | Mu(x,t) -> "mu " ^ x ^ "." ^ show t
-                        | Nu(x,t) -> "nu " ^ x ^ "." ^ show t
+                        | Mu(x,_,t) -> "mu " ^ x ^ "." ^ show t
+                        | Nu(x,_,t) -> "nu " ^ x ^ "." ^ show t
   in
   show 
 
@@ -195,7 +199,9 @@ module MakeHOLattice(M: Lattice): HOLattice =
       aux_size
 
     let height = function FuncType args -> (M.height ()) * (List.fold_left (fun x y -> x*y) 1 (List.map size args))
-                                         
+
+    let max_table_width = function FuncType args -> List.fold_left (fun b -> fun a -> b * (size a)) 1 args
+                                                  
     let evaluate term =
       let env = ref [] in
       let update_env t v = 
@@ -210,7 +216,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                 | None -> failwith ("ERROR: unbound variable `" ^ x ^ "´!")
       in
       let show_arguments args =
-        List.iteri (fun i -> fun t -> output 2 (" #" ^ string_of_int i ^ "=" ^ show_table t)) args;
+        List.iteri (fun i -> fun t -> output 3 (" #" ^ string_of_int i ^ " = " ^ show_table t)) args;
       in
       let var_table_lookup args x =
         let xt = get_var_table x in
@@ -252,8 +258,8 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                 | FuncType(argtypes) -> Table(List.map (fun args -> (Key(args), f args)) (arguments argtypes))
       in
 
-      let show_environment d =
-        List.iter (fun (x,t) -> output d (" " ^ show_term x ^ " = " ^ show_table t)) !env;
+      let show_environment _ =
+        List.iter (fun (x,t) -> output 3 (" " ^ show_term x ^ " = " ^ show_table t)) !env;
       in
 
       let merge_iterations =
@@ -263,37 +269,33 @@ module MakeHOLattice(M: Lattice): HOLattice =
       in
 
       let rec eval term args =
-        output 1 ("Starting evaluation of term `" ^ show_term term ^ "´");
-        output 2 (let l = List.length args in "on " ^ string_of_int l ^ " argument(s)" ^ (if l > 0 then ":" else ""));
+        output 1 ("Evaluation of term `" ^ show_term term ^ "´ on " ^ string_of_int (List.length args) ^ " argument(s)");
+        (*        output 3 (let l = List.length args in "on " ^ string_of_int l ^ " argument(s)" ^ (if l > 0 then ":" else "")); *)
         show_arguments args;
-        output 2 (let l = List.length !env in "w.r.t. " ^ (if l=0 then "the empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
-        show_environment 2;
+        output 3 (let l = List.length !env in "w.r.t. " ^ (if l=0 then "the empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
+        show_environment ();
         indent_up ();
         let result = match term with
-            Var(x)  -> output 2 "Variable case.";
+            Var(x)  -> output 3 "Variable case.";
                        var_table_lookup args x
-          | Base(f) -> output 2 "Base function case.";
+          | Base(f) -> output 3 "Base function case.";
                        base_func_lookup args f
-          | Appl(t,ts) -> output 2 "Application case.";
-                          let new_args = List.map (fun (t',tau) -> indent_up ();
-                                                                   let table = match get_table t' with
+          | Appl(t,ts) -> output 3 "Application case.";
+                          let new_args = List.map (fun (t',tau) -> match get_table t' with
                                                                        Some(table) -> begin
-                                                                                        output 3 ("Table for argument `" ^ show_term t' ^ "´ is available.");
+                                                                                        output 4 ("Table for argument `" ^ show_term t' ^ "´ is available.");
                                                                                         table
                                                                                       end
                                                                       | None -> begin
-                                                                                  output 3 ("Now making table for argument `" ^ show_term t' ^ "´");
+                                                                                  output 4 ("Now making table for argument `" ^ show_term t' ^ "´");
                                                                                   let table = make_table (eval t') tau in
                                                                                   update_env t' table;
                                                                                   table
-                                                                                end
-                                                                   in
-                                                                   indent_down ();
-                                                                   table)
+                                                                                end)
                                            ts
                           in
                           eval t (new_args@args)
-          | Lamb(xs,t) -> output 2 "Lambda-abstraction case.";
+          | Lamb(xs,t) -> output 3 "Lambda-abstraction case.";
                           let rec bind ys bs = match (ys,bs) with
                               ([],_) -> bs
                             | (z::zs,[]) -> failwith "ERROR: not enough arguments to bind all lambda variables!"
@@ -302,56 +304,64 @@ module MakeHOLattice(M: Lattice): HOLattice =
                           in
                           let rargs = bind xs args in
                           eval t rargs
-          | Mu(x,t) -> let i = ref 0 in
-                       output 2 "LFP case.";
-                       update_env (Var(x)) (Table([(Key(args),M.bot); (Any,M.bot)]));
-                       while output 3 (let l = List.length !env in
-                                       "starting LFP iteration #" ^ string_of_int !i ^ " with " ^
-                                         (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
-                             incr i;
-                             show_environment 3;
-                             let (next_table,changed) = table_map (eval t) (get_var_table x) in
-                             let ln = table_width next_table in
-                             let xt = get_var_table x in
-                             let lx = table_width xt in
-                             if (ln <> lx) then
-                               begin
-                                 update_env (Var(x)) (merge_iterations (xt,next_table));
-                                 true
-                               end
-                             else
-                               begin
-                                 update_env (Var(x)) next_table;
-                                 changed
-                               end
-                       do ()
-                       done;
-                       table_lookup args (get_var_table x)
-          | Nu(x,t) -> let i = ref 0 in
-                       output 2 "GFP case.";
-                       update_env (Var(x)) (Table([(Key(args),M.top); (Any,M.top)]));
-                       while output 3 (let l = List.length !env in
-                                       "starting GFP iteration #" ^ string_of_int !i ^ " with " ^
-                                         (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
-                             incr i;
-                             show_environment 3;
-                             let (next_table,changed) = table_map (eval t) (get_var_table x) in
-                             let ln = table_width next_table in
-                             let xt = get_var_table x in
-                             let lx = table_width xt in
-                             if (ln <> lx) then
-                               begin
-                                 update_env (Var(x)) (merge_iterations (xt,next_table));
-                                 true
-                               end
-                             else
-                               begin
-                                 update_env (Var(x)) next_table;
-                                 changed
-                               end
-                       do ()
-                       done;
-                       table_lookup args (get_var_table x)
+          | Mu(x,tau,t) -> let mt = max_table_width tau in
+                           let i = ref 0 in
+                           output 3 "LFP case.";
+                           update_env (Var(x)) (Table([(Key(args),M.bot); (Any,M.bot)]));
+                           while output 2 ("starting LFP iteration #" ^ string_of_int !i);
+                                 incr i;
+                                 output 3 (let l = List.length !env in
+                                           "with " ^ (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
+                                 show_environment 3;
+                                 let xt = get_var_table x in
+                                 output 2 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^ string_of_int mt);
+                                 let (next_table,changed) = table_map (eval t) xt in
+                                 let ln = table_width next_table in
+                                 let xt = get_var_table x in
+                                 let lx = table_width xt in
+                                 if (ln <> lx) then
+                                   begin
+                                     update_env (Var(x)) (merge_iterations (xt,next_table));
+                                     true
+                                   end
+                                 else
+                                   begin
+                                     update_env (Var(x)) next_table;
+                                     changed
+                                   end
+                           do ()
+                           done;
+                           output 2 ("finished after " ^ string_of_int (!i-1) ^ " iterations of possible " ^ string_of_int (height tau));
+                           table_lookup args (get_var_table x)
+          | Nu(x,tau,t) -> let mt = max_table_width tau in
+                           let i = ref 0 in
+                           output 3 "GFP case.";
+                           update_env (Var(x)) (Table([(Key(args),M.top); (Any,M.top)]));
+                           while output 2 ("starting GFP iteration #" ^ string_of_int !i);
+                                 incr i;
+                                 output 3 (let l = List.length !env in
+                                           "with " ^ (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
+                                 show_environment 3;
+                                 let xt = get_var_table x in
+                                 output 2 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^ string_of_int mt);
+                                 let (next_table,changed) = table_map (eval t) xt in
+                                 let ln = table_width next_table in
+                                 let xt = get_var_table x in
+                                 let lx = table_width xt in
+                                 if (ln <> lx) then
+                                   begin
+                                     update_env (Var(x)) (merge_iterations (xt,next_table));
+                                     true
+                                   end
+                                 else
+                                   begin
+                                     update_env (Var(x)) next_table;
+                                     changed
+                                   end
+                           do ()
+                           done;
+                           output 2 ("finished after " ^ string_of_int (!i-1) ^ " iterations of possible " ^ string_of_int (height tau));
+                           table_lookup args (get_var_table x)
         in
         indent_down ();
         output 1 ("resulting in value `" ^ M.show result ^ "´.");

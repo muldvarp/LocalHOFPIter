@@ -3,6 +3,11 @@
 open HOFPIteration
 
 let n = ref 2
+let _ =
+  n := (try
+          int_of_string Sys.argv.(1)
+        with _ -> 2);
+  
     
 module RELattice =
   struct
@@ -62,11 +67,6 @@ module RELattice =
     let base_funcs = [("null",null); ("a",a); ("b",b); ("c",c); ("ite",ite)]           
   end
 
-let _ =
-  n := (try
-          int_of_string Sys.argv.(1)
-        with _ -> 2);
-  
 module RE = MakeHOLattice(RELattice)
 
 let _ =
@@ -93,7 +93,7 @@ let _ =
       let x = aux_var () in
       (Lamb([x], Appl(f,[(Appl(g,[(Var(x),typ0)]),typ0)])),typ1)
     in
-    Appl(Mu("F",
+    Appl(Mu("F",typ1,
             Lamb(["f"; "g"; "x"],
                  ite((Appl(f,[(Appl(Var("g"),[x]), typ0)]), typ0),
                      (Appl(Var("F"),[(comp a' f); (comp b' g); c(x)]), typ0)))),

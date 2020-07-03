@@ -99,15 +99,16 @@ module PowerSetLattice =
     let b_box = function    [x]   -> neg [b_dia [neg [x]]]
                               | _     -> failwith ("ERROR: wrong number of arguments given to function `b-box!")
 
-    let base_funcs = [("p",p);("neg", neg);("disj",disj); ("conj", conj); ("a_dia", a_dia); ("a_box", a_box); ("b_dia", b_dia); ("b_box", b_box)]
+    let base_funcs = [("p",p);("neg", neg);("disj",disj); ("conj", conj); ("<a>", a_dia); ("[a]", a_box); ("<b>", b_dia); ("[b]", b_box)]
   end
 
-  module PS = MakeHOLattice(PowerSetLattice)
+
+module PS = MakeHOLattice(PowerSetLattice)
 
   let _ =
     let typ0 = grtype in
     let typ1 = FuncType([typ0]) in
-    let a_dia_func = Lamb(["x"], Appl( Base("a_dia"), [(Var("x"), typ0)])) in
+    let a_dia_func = Lamb(["x"], Appl( Base("<a>"), [(Var("x"), typ0)])) in
     let left_conj = Appl(Var("f"), [(Base("p"),typ0)]) in
     let f_composition = Lamb(
                               ["y"], 
@@ -123,6 +124,6 @@ module PowerSetLattice =
                                     ]
                                   )
                             ) in
-    let right_conj = Appl(Base("b_dia"),[(Appl(Var("F"),[(f_composition,typ1)]),typ0)]) in
-    let phi = Appl(   Nu("F",Lamb(["f"], Appl(Base("conj"), [(left_conj,typ0);(right_conj,typ0)]))),    [(a_dia_func,typ1)]) in
+    let right_conj = Appl(Base("<b>"),[(Appl(Var("F"),[(f_composition,typ1)]),typ0)]) in
+    let phi = Appl(   Nu("F",typ1,Lamb(["f"], Appl(Base("conj"), [(left_conj,typ0);(right_conj,typ0)]))),    [(a_dia_func,typ1)]) in
     PS.evaluate phi
