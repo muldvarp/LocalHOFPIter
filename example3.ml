@@ -23,7 +23,12 @@ module PowerSetLattice =
     
     let bot = Array.make !n false
     
-    let size _ = int_of_float (2. ** ((float) (!n)) )
+    let size _ =
+      let rec exp = function 0 -> 1
+                           | n -> 2*(exp (n-1))
+      in
+      exp !n
+      
     let height _ = !n + 1
     
     let p _ = Array.init !n (fun i -> i=0)  
