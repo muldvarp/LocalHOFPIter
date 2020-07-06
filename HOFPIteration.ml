@@ -6,9 +6,9 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 2 (* 0=silent, 
-                     1=see recursion and results, 
-                     2=... plus info about number and widths of tables in fixpoint iterations, 
+let verbosity = 1 (* 0=silent, 
+                     1=see info about number and widths of tables in fixpoint iterations, 
+                     2=... plus recursion and results, 
                      3=... and arguments and environments, 
                      4=... and function table building in application cases *)
 let depth = ref 0
@@ -24,6 +24,7 @@ let output i s = if i <= verbosity then
                                     else ""
                      in
                      print_string(prefix ^ s ^ "\n");
+                     flush stdout
                    end;
                  section_start := false
 
@@ -111,7 +112,8 @@ module MakeHOLattice(M: Lattice): HOLattice =
     let table t = Table(t)              
 
     let table_width = function Const _ -> 1
-                             | Table(entries) -> List.length (List.filter (function (Key(_),_) -> true | _ -> false) entries)
+                             | Table(entries) -> List.length (List.filter (function (Key(_),_) -> true | _ -> false)
+                                                                entries)
                                                
     let bot = function FuncType [] -> Const(M.bot)
                      | FuncType ts -> Table([Any,M.bot])
@@ -269,18 +271,18 @@ module MakeHOLattice(M: Lattice): HOLattice =
       in
 
       let rec eval term args =
-        output 1 ("Evaluation of term `" ^ show_term term ^ "´ on " ^ string_of_int (List.length args) ^ " argument(s)");
-        (*        output 3 (let l = List.length args in "on " ^ string_of_int l ^ " argument(s)" ^ (if l > 0 then ":" else "")); *)
+        output 2 (let l = List.length args in
+                  "Evaluation of term `" ^ show_term term ^ "´ on " ^ string_of_int (List.length args) ^ " argument" ^ (if l=1 then "" else "s"));
         show_arguments args;
         output 3 (let l = List.length !env in "w.r.t. " ^ (if l=0 then "the empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
         show_environment ();
         indent_up ();
         let result = match term with
-            Var(x)  -> output 3 "Variable case.";
+            Var(x)  -> output 2 "Variable case.";
                        var_table_lookup args x
-          | Base(f) -> output 3 "Base function case.";
+          | Base(f) -> output 2 "Base function case.";
                        base_func_lookup args f
-          | Appl(t,ts) -> output 3 "Application case.";
+          | Appl(t,ts) -> output 2 "Application case.";
                           let new_args = List.map (fun (t',tau) -> match get_table t' with
                                                                        Some(table) -> begin
                                                                                         output 4 ("Table for argument `" ^ show_term t' ^ "´ is available.");
@@ -295,7 +297,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                            ts
                           in
                           eval t (new_args@args)
-          | Lamb(xs,t) -> output 3 "Lambda-abstraction case.";
+          | Lamb(xs,t) -> output 2 "Lambda-abstraction case.";
                           let rec bind ys bs = match (ys,bs) with
                               ([],_) -> bs
                             | (z::zs,[]) -> failwith "ERROR: not enough arguments to bind all lambda variables!"
@@ -304,17 +306,19 @@ module MakeHOLattice(M: Lattice): HOLattice =
                           in
                           let rargs = bind xs args in
                           eval t rargs
-          | Mu(x,tau,t) -> let mt = max_table_width tau in
-                           let i = ref 0 in
-                           output 3 "LFP case.";
+          | Mu(x,tau,t) -> output 2 "LFP case.";
+                           let mt = max_table_width tau in
+                           let ht = height tau in
+                           let i = ref 1 in
                            update_env (Var(x)) (Table([(Key(args),M.bot); (Any,M.bot)]));
-                           while output 2 ("starting LFP iteration #" ^ string_of_int !i);
+                           while output 1 ("starting LFP iteration #" ^ string_of_int !i ^ " for FP variable `" ^ x ^ "´");
                                  incr i;
                                  output 3 (let l = List.length !env in
                                            "with " ^ (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
                                  show_environment 3;
                                  let xt = get_var_table x in
-                                 output 2 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^ string_of_int mt);
+                                 output 1 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^
+                                             (if mt > 0 then string_of_int mt else ">" ^ string_of_int max_int));
                                  let (next_table,changed) = table_map (eval t) xt in
                                  let ln = table_width next_table in
                                  let xt = get_var_table x in
@@ -331,19 +335,22 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                    end
                            do ()
                            done;
-                           output 2 ("finished after " ^ string_of_int (!i-1) ^ " iterations of possible " ^ string_of_int (height tau));
+                           output 1 ("finished after " ^ string_of_int (!i-1) ^ " iterations of possible " ^
+                                       (if ht > 0 then string_of_int ht else ">" ^ string_of_int max_int));
                            table_lookup args (get_var_table x)
-          | Nu(x,tau,t) -> let mt = max_table_width tau in
-                           let i = ref 0 in
-                           output 3 "GFP case.";
+          | Nu(x,tau,t) -> output 2 "GFP case.";
+                           let mt = max_table_width tau in
+                           let ht = height tau in
+                           let i = ref 1 in
                            update_env (Var(x)) (Table([(Key(args),M.top); (Any,M.top)]));
-                           while output 2 ("starting GFP iteration #" ^ string_of_int !i);
+                           while output 1 ("starting GFP iteration #" ^ string_of_int !i ^ " for FP variable `" ^ x ^ "´");
                                  incr i;
                                  output 3 (let l = List.length !env in
                                            "with " ^ (if l=0 then "empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
                                  show_environment 3;
                                  let xt = get_var_table x in
-                                 output 2 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^ string_of_int mt);
+                                 output 1 ("width of table for FP variable `" ^ x ^ "´ is " ^ string_of_int (table_width xt) ^ " of possible " ^
+                                             (if mt > 0 then string_of_int mt else ">" ^ string_of_int max_int));
                                  let (next_table,changed) = table_map (eval t) xt in
                                  let ln = table_width next_table in
                                  let xt = get_var_table x in
@@ -360,11 +367,12 @@ module MakeHOLattice(M: Lattice): HOLattice =
                                    end
                            do ()
                            done;
-                           output 2 ("finished after " ^ string_of_int (!i-1) ^ " iterations of possible " ^ string_of_int (height tau));
+                           output 1 ("finished after " ^ string_of_int (!i-1) ^ " iteration" ^ (if !i=2 then "" else "s") ^ " of possible " ^
+                                       (if ht > 0 then string_of_int ht else ">" ^ string_of_int max_int));
                            table_lookup args (get_var_table x)
         in
         indent_down ();
-        output 1 ("resulting in value `" ^ M.show result ^ "´.");
+        output 2 ("resulting in value `" ^ M.show result ^ "´.");
         result
       in
       eval term []

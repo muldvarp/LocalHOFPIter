@@ -6,7 +6,7 @@ let tokens = ref "bs"
 
 let _ =
   if Array.length Sys.argv > 1 then tokens := Sys.argv.(1);
-  print_string ("Parsing " ^ !tokens ^ "\n");
+  print_string ("Parsing `" ^ !tokens ^ "´\n")
 
            
 module ParsingLattice =
@@ -88,6 +88,7 @@ let _ =
       pre ^ string_of_int j
     in
     let typ0 = grtype in
+    let typX = FuncType([typ0]) in
     let typ1 = FuncType([typ0;typ0]) in
     let typ2 = FuncType([typ1]) in
     let start = (Base("start"),typ0) in
@@ -111,7 +112,7 @@ let _ =
       let e = get_var "e" in
       let x = get_var "X" in
       let h = get_var "h" in
-      Lamb([f;g;s;e], Appl(Mu(x, typ0, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
+      Lamb([f;g;s;e], Appl(Mu(x, typX, Lamb([h], disj (conj (Appl(Var(f),[(Var(s),typ0);(Var(h),typ0)]))
                                                          (Appl(Var(g),[(Var(h),typ0);(Var(e),typ0)])))
                                                    (Appl(Var(x),[(Appl(Base("next"),[(Var(h),typ0)]),typ0)])))), [(Var(s),typ0)]))
     in

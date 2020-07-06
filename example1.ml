@@ -7,7 +7,8 @@ let _ =
   n := (try
           int_of_string Sys.argv.(1)
         with _ -> 2);
-  
+  print_string ("Checking reachability on clover-shaped transition system with parameter " ^ string_of_int !n ^ "\n")
+
     
 module RELattice =
   struct
@@ -73,6 +74,7 @@ let _ =
   let phi_reach =
     let typ0 = grtype in
     let typ1 = FuncType([typ0]) in
+    let typ2 = FuncType([typ1;typ1;typ0]) in
     let null = (Base("null"),typ0) in
     let x = (Var("x"),typ0) in
     let a = (Base("a"),typ1) in
@@ -93,7 +95,7 @@ let _ =
       let x = aux_var () in
       (Lamb([x], Appl(f,[(Appl(g,[(Var(x),typ0)]),typ0)])),typ1)
     in
-    Appl(Mu("F",typ1,
+    Appl(Mu("F",typ2,
             Lamb(["f"; "g"; "x"],
                  ite((Appl(f,[(Appl(Var("g"),[x]), typ0)]), typ0),
                      (Appl(Var("F"),[(comp a' f); (comp b' g); c(x)]), typ0)))),

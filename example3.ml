@@ -7,7 +7,8 @@ let n = ref 2
 let _ =
   n := (try
           int_of_string Sys.argv.(1)
-        with _ -> 2)
+        with _ -> 2);
+  print_string ("Model checking HFL property on transition system with parameter " ^ string_of_int !n ^ "\n")
 
 module PowerSetLattice =
   struct

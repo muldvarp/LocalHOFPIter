@@ -24,7 +24,7 @@ J. Kreiker of the University of Applied Sciences Fulda, Germany.
 
     example2 <s>
 
-  where <s> is a string interepreted as a sequence of tokens for a grammar
+  where <s> is a string interpreted as a sequence of tokens for a grammar
   that recognizes words over the alphabet {'b','c','s'} (for 'block', 'code',
   'space'). Default is "bsc". 
 
