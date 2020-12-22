@@ -6,7 +6,7 @@ let rec prefix = function 0 -> fun _ -> []
                                       | (x::xs) -> x::(prefix (n-1) xs)
                                                  
 (*** Output ***)
-let verbosity = 1 (* 0=silent, 
+let verbosity = 2 (* 0=silent, 
                      1=see info about number and widths of tables in fixpoint iterations, 
                      2=... plus recursion and results, 
                      3=... and arguments and environments, 
@@ -45,7 +45,45 @@ let rec is_subterm t t' = (t=t') || match t' with
                                     | Mu(_,_,t'') -> is_subterm t t''
                                     | Nu(_,_,t'') -> is_subterm t t''
                                     | _ -> false
-                                         
+
+
+module VarSet = Set.Make(String);;
+
+let rec free_vars = function Var(x) -> VarSet.singleton x
+                           | Base(_) -> VarSet.empty
+                           | Appl(f,ts) -> let fvs = List.fold_left VarSet.union VarSet.empty (List.map (fun (t,_) -> free_vars t ) ts) in
+                                           VarSet.union (free_vars f) fvs
+                           | Lamb(xs,t) -> let fvs = free_vars t in
+                                           List.fold_left (fun s -> fun x -> VarSet.remove x s) fvs xs
+                           | Mu(x,_,t) -> VarSet.remove x (free_vars t)
+                           | Nu(x,_,t) -> VarSet.remove x (free_vars t)
+
+let is_strongly_unnested =
+  let free_varss ts = List.fold_left VarSet.union VarSet.empty (List.map free_vars ts) in
+  let check_free_vars_in_args x ys = 
+    let rec check = function Appl(Var(z),ts) -> let ts = List.map fst ts in
+                                                if x=z then
+                                                  VarSet.subset (free_varss ts) ys
+                                                else List.fold_left (fun b -> fun t -> b && check t) true ts
+                           | Appl(f,ts) -> let ts = List.map fst ts in
+                                           List.fold_left (fun b -> fun t -> b && check t) (check f) ts
+                           | Lamb(_,t) -> check t
+                           | Mu(z,_,t) -> x=z || x<>z && check t
+                           | Nu(z,_,t) -> x=z || x<>z && check t
+                           | _ -> true
+    in
+    check                                                                              
+  in
+  let rec isunnest = function Appl(f,ts) -> List.fold_left (fun b -> fun t -> b && (isunnest t)) (isunnest f) (List.map fst ts)
+                            | Lamb(_,t) -> isunnest t
+                            | Mu(x,_,Lamb(ys,t)) -> (check_free_vars_in_args x (VarSet.of_list ys) t) && (isunnest t)
+                            | Nu(x,_,Lamb(ys,t)) -> (check_free_vars_in_args x (VarSet.of_list ys) t) && (isunnest t)
+                            | Mu(x,_,t) -> (check_free_vars_in_args x VarSet.empty t) && (isunnest t)
+                            | Nu(x,_,t) -> (check_free_vars_in_args x VarSet.empty t) && (isunnest t)
+                            | _ -> true
+  in
+  isunnest
+  
 let show_term =
   let is_atomic = function Var _  -> true
                          | Base _ -> true
@@ -76,13 +114,13 @@ module type Lattice =
     
     val equal : t -> t -> bool
 
-    val top: t
-    val bot: t
+    val top: unit -> t
+    val bot: unit -> t
       
     val size: unit -> int
     val height: unit -> int
 
-    val first: t
+    val first: unit -> t
     val next: t -> t option
 
     val base_funcs: (string * (t list -> t)) list
@@ -115,24 +153,24 @@ module MakeHOLattice(M: Lattice): HOLattice =
                              | Table(entries) -> List.length (List.filter (function (Key(_),_) -> true | _ -> false)
                                                                 entries)
                                                
-    let bot = function FuncType [] -> Const(M.bot)
-                     | FuncType ts -> Table([Any,M.bot])
-    let top = function FuncType [] -> Const(M.top)
-                     | FuncType ts -> Table([Any,M.top])
+    let bot = function FuncType [] -> Const(M.bot ())
+                     | FuncType ts -> Table([Any,M.bot ()])
+    let top = function FuncType [] -> Const(M.top ())
+                     | FuncType ts -> Table([Any,M.top ()])
 
     let rec elements =
       let base_elements = let rec enum elems = function None -> elems
                                                       | Some x -> enum (const(x)::elems) (M.next x)
                           in
-                          enum [] (Some(M.first))
+                          enum [] (Some(M.first ()))
       in
       function FuncType [] -> base_elements
              | FuncType ts -> let args = arguments ts in
-                              let first = List.map (fun a -> (a,M.first)) args in
+                              let first = List.map (fun a -> (a,M.first ())) args in
                               let next =
                                 let rec nxt acc = function []        -> None
                                                          | (a,x)::rs -> match M.next x with
-                                                                          None -> nxt ((a,M.first)::acc) rs
+                                                                          None -> nxt ((a,M.first ())::acc) rs
                                                                         | Some y -> Some ((List.rev acc) @ ((a,y)::rs))
                                 in
                                 nxt []
@@ -271,8 +309,9 @@ module MakeHOLattice(M: Lattice): HOLattice =
       in
 
       let rec eval term args =
+        output 2 ("Starting evaluation of term `" ^ show_term term ^ "´");
         output 2 (let l = List.length args in
-                  "Evaluation of term `" ^ show_term term ^ "´ on " ^ string_of_int (List.length args) ^ " argument" ^ (if l=1 then "" else "s"));
+                  "on " ^ string_of_int (List.length args) ^ " argument" ^ (if l=1 then "" else "s"));
         show_arguments args;
         output 3 (let l = List.length !env in "w.r.t. " ^ (if l=0 then "the empty " else "") ^ "environment" ^ (if l>0 then ":" else ""));
         show_environment ();
@@ -310,7 +349,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                            let mt = max_table_width tau in
                            let ht = height tau in
                            let i = ref 1 in
-                           update_env (Var(x)) (Table([(Key(args),M.bot); (Any,M.bot)]));
+                           update_env (Var(x)) (Table([(Key(args),M.bot ()); (Any,M.bot ())]));
                            while output 1 ("starting LFP iteration #" ^ string_of_int !i ^ " for FP variable `" ^ x ^ "´");
                                  incr i;
                                  output 3 (let l = List.length !env in
@@ -342,7 +381,7 @@ module MakeHOLattice(M: Lattice): HOLattice =
                            let mt = max_table_width tau in
                            let ht = height tau in
                            let i = ref 1 in
-                           update_env (Var(x)) (Table([(Key(args),M.top); (Any,M.top)]));
+                           update_env (Var(x)) (Table([(Key(args),M.top ()); (Any,M.top ())]));
                            while output 1 ("starting GFP iteration #" ^ string_of_int !i ^ " for FP variable `" ^ x ^ "´");
                                  incr i;
                                  output 3 (let l = List.length !env in
@@ -375,6 +414,9 @@ module MakeHOLattice(M: Lattice): HOLattice =
         output 2 ("resulting in value `" ^ M.show result ^ "´.");
         result
       in
+      output 1 ("Evaluation initialised for term `" ^ show_term term ^ "´");
+(*      let unnested = is_strongly_unnested term in
+      output 1 ("Checking whether it is strongly unnested ... " ^ (if unnested then "yes!" else "no.")); *)
       eval term []
 end;;
      

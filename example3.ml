@@ -20,9 +20,9 @@ module PowerSetLattice =
     let show set = 
        "{" ^ String.concat "," (List.filter (fun s -> s <> "") (Array.to_list (Array.mapi (fun i -> fun b -> if b then string_of_int i else "") set))) ^ "}"
     
-    let top = Array.make !n true
+    let top _ = Array.make !n true
     
-    let bot = Array.make !n false
+    let bot _ = Array.make !n false
     
     let size _ =
       let rec exp = function 0 -> 1
@@ -36,7 +36,7 @@ module PowerSetLattice =
     
     let first = bot
 
-    let next set = if set=top then None
+    let next set = if set=(top ()) then None
                    else 
                      let change = ref true in
                      Some (Array.mapi (fun i -> fun b -> if !change then

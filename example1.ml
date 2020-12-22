@@ -27,10 +27,10 @@ module RELattice =
                       | Bot -> "B"
                       | Num(i) -> string_of_int i
                                 
-    let top = Top
-    let bot = Bot
+    let top _ = Top
+    let bot _ = Bot
 
-    let first = Bot
+    let first _ = Bot
     let next = function Top -> None
                       | Bot -> Some(Num(0))
                       | Num(i) -> if i = 3 * !n then Some(Top) else Some(Num(i+1))
